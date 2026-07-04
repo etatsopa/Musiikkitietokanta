@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f0f0f">
+<title>Musiikkihaku</title>
+<style>
+  :root {
+    --bg:       #0f0f0f;
+    --surface:  #1a1a1a;
+    --surface2: #242424;
+    --border:   #2e2e2e;
+    --text:     #f0f0f0;
+    --muted:    #888;
+    --accent:   #c8a96e;   /* lämmin kulta – vinyyli/albumikansivibe */
+    --radius:   12px;
+    --flac:     #1d9e75;
+    --mp3:      #378add;
+    --aac:      #ba7517;
+    --wav:      #d4537e;
+    --ogg:      #7f77dd;
+    --other:    #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(15,15,15,0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 1rem 1rem 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .logo {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    font-weight: 500;
+  }
+
+  .search-wrap {
+    position: relative;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  input[type="search"] {
+    width: 100%;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 16px;         /* prevents iOS zoom */
+    padding: 0.65rem 0.75rem 0.65rem 2.5rem;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  input[type="search"]:focus { border-color: var(--accent); }
+  input[type="search"]::placeholder { color: var(--muted); }
+  input[type="search"]::-webkit-search-cancel-button { display: none; }
+
+  .clear-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    display: none;
+  }
+
+  main { padding: 0 0 2rem; }
+
+  .status-bar {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 0.6rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .status-bar button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+  .empty-state .icon {
+    font-size: 40px;
+    margin-bottom: 1rem;
+    opacity: 0.4;
+  }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  .album-list { list-style: none; }
+
+  .album-item {
+    border-bottom: 0.5px solid var(--border);
+  }
+  .album-item:last-child { border-bottom: none; }
+
+  .album-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 0.9rem 1rem;
+  }
+
+  .album-icon {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .album-icon svg { color: var(--accent); opacity: 0.7; }
+
+  .album-text { flex: 1; min-width: 0; }
+
+  .album-name {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .album-artist {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  mark {
+    background: rgba(200, 169, 110, 0.25);
+    color: var(--accent);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  .album-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: -apple-system-mono, "SF Mono", monospace;
+  }
+  .badge-FLAC { background: rgba(29,158,117,0.15); color: var(--flac); }
+  .badge-MP3  { background: rgba(55,138,221,0.15); color: var(--mp3);  }
+  .badge-AAC  { background: rgba(186,117,23,0.18); color: var(--aac);  }
+  .badge-WAV  { background: rgba(212,83,126,0.15); color: var(--wav);  }
+  .badge-OGG  { background: rgba(127,119,221,0.15);color: var(--ogg); }
+  .badge-other{ background: rgba(102,102,102,0.15);color: var(--other);}
+
+  .album-meta-right {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .album-year {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .track-count {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .section-header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.5rem 1rem 0.4rem;
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  /* Latausnäkymä */
+  #setup-view {
+    padding: 2rem 1.25rem;
+  }
+  .setup-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .setup-card h2 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+  .setup-card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+  }
+  .setup-card input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+    padding: 0.6rem 0.75rem;
+    outline: none;
+    margin-bottom: 0.5rem;
+  }
+  .setup-card input[type="text"]:focus { border-color: var(--accent); }
+  .primary-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #0f0f0f;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0.75rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+  }
+  .primary-btn:active { opacity: 0.85; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 0.4rem; }
+</style>
+</head>
+<body>
+
+<!-- Latausnäkymä (näkyy ennen kuin tiedosto-ID on asetettu) -->
+<div id="setup-view" style="display:none;">
+  <div style="text-align:center; padding: 2rem 0 1.5rem;">
+    <div style="font-size:11px; letter-spacing:0.12em; color:var(--accent); text-transform:uppercase; margin-bottom:0.5rem;">Musiikkihaku</div>
+    <div style="font-size:28px; font-weight:300; color:var(--text);">Yhdistä tietokantaan</div>
+  </div>
+  <div class="setup-card">
+    <h2>Google Drive -tiedoston ID</h2>
+    <p>
+      Aja ensin <code>scan_music.py</code> kotikoneellasi. Skripti tulostaa tiedosto-ID:n,
+      esimerkiksi: <code>1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs</code>
+    </p>
+    <input type="text" id="file-id-input" placeholder="Liitä tiedosto-ID tähän" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="primary-btn" onclick="saveFileId()">Tallenna ja avaa haku</button>
+    <p class="hint">ID tallennetaan tähän laitteeseen. Sinun ei tarvitse syöttää sitä uudelleen.</p>
+  </div>
+</div>
+
+<!-- Hakunäkymä -->
+<div id="search-view" style="display:none;">
+  <header>
+    <div class="logo">Musiikkihaku</div>
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="search" id="q" placeholder="Hae artistia…" autocomplete="off" autocorrect="off" spellcheck="false" oninput="onSearch()">
+      <button class="clear-btn" id="clear-btn" onclick="clearSearch()" aria-label="Tyhjennä haku">✕</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="status-bar" class="status-bar" style="display:none;">
+      <span id="status-text"></span>
+      <button onclick="refreshData()">Päivitä</button>
+    </div>
+    <div id="results"></div>
+  </main>
+</div>
+
+<!-- Latausanimaatio -->
+<div id="loading-view" style="display:none; text-align:center; padding: 4rem 2rem; color:var(--muted); font-size:14px;">
+  Ladataan tietokantaa…
+</div>
+
+<script>
+const DB_KEY      = "music_scan_file_id";
+const CACHE_KEY   = "music_scan_cache";
+const CACHE_TS    = "music_scan_cache_ts";
+const CACHE_TTL   = 60 * 60 * 1000; // 1 tunti
+
+let allAlbums = [];
+let lastQuery  = "";
+
+// ── Käynnistys ─────────────────────────────────────────────────────────────────
+
+window.addEventListener("DOMContentLoaded", async () => {
+  const fileId = localStorage.getItem(DB_KEY);
+  if (!fileId) {
+    show("setup-view");
+    return;
+  }
+  await loadData(fileId);
+});
+
+function show(id) {
+  ["setup-view", "search-view", "loading-view"].forEach(v =>
+    document.getElementById(v).style.display = (v === id ? "block" : "none")
+  );
+}
+
+// ── Asetukset ──────────────────────────────────────────────────────────────────
+
+function saveFileId() {
+  const val = document.getElementById("file-id-input").value.trim();
+  if (!val) return;
+  localStorage.setItem(DB_KEY, val);
+  loadData(val);
+}
+
+// ── Datan lataus ───────────────────────────────────────────────────────────────
+
+async function loadData(fileId, forceRefresh = false) {
+  // Käytä välimuistia jos tuore
+  if (!forceRefresh) {
+    const cached = localStorage.getItem(CACHE_KEY);
+    const ts     = parseInt(localStorage.getItem(CACHE_TS) || "0");
+    if (cached && Date.now() - ts < CACHE_TTL) {
+      try {
+        const data = JSON.parse(cached);
+        allAlbums  = data.albums || [];
+        initSearch(data, false);
+        return;
+      } catch (_) {}
+    }
+  }
+
+  show("loading-view");
+  try {
+    // Google Drive export-linkki (ei vaadi kirjautumista, tiedosto julkinen)
+    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=AIzaSyD-9tSrke72PbmUwgebLNld7z2jh2WL-vI`;
+    // Huom: yllä oleva on Googlen demo-avain rajoitetuilla oikeuksilla.
+    // Julkiset tiedostot voi ladata myös suoraan:
+    const exportUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+    const res  = await fetch(exportUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_TS, String(Date.now()));
+
+    allAlbums = data.albums || [];
+    initSearch(data, true);
+  } catch (err) {
+    show("search-view");
+    document.getElementById("results").innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>Tietokannan lataus epäonnistui.<br>${err.message}<br><br>
+        Tarkista, että tiedosto-ID on oikein ja tiedosto on jaettu julkiseksi.</p>
+        <button onclick="resetSetup()" style="margin-top:1rem; background:none; border:0.5px solid var(--border); color:var(--accent); border-radius:8px; padding:0.5rem 1rem; font-size:13px; cursor:pointer;">
+          Vaihda tiedosto-ID
+        </button>
+      </div>`;
+  }
+}
+
+function refreshData() {
+  const fileId = localStorage.getItem(DB_KEY);
+  if (fileId) loadData(fileId, true);
+}
+
+function resetSetup() {
+  localStorage.removeItem(DB_KEY);
+  location.reload();
+}
+
+function initSearch(data, fresh) {
+  show("search-view");
+  const sb = document.getElementById("status-bar");
+  sb.style.display = "flex";
+  document.getElementById("status-text").textContent =
+    `${data.album_count} albumia${fresh ? " · juuri päivitetty" : " · välimuistista"}`;
+  renderResults("");
+  document.getElementById("q").focus();
+}
+
+// ── Haku ───────────────────────────────────────────────────────────────────────
+
+function onSearch() {
+  const q = document.getElementById("q").value.trim();
+  document.getElementById("clear-btn").style.display = q ? "block" : "none";
+  renderResults(q);
+  lastQuery = q;
+}
+
+function clearSearch() {
+  document.getElementById("q").value = "";
+  document.getElementById("clear-btn").style.display = "none";
+  renderResults("");
+}
+
+function normalize(s) {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function highlight(text, query) {
+  if (!query || !text) return escHtml(text || "");
+  const escaped = escHtml(text);
+  const re = new RegExp(`(${escRegex(query)})`, "gi");
+  return escaped.replace(re, "<mark>$1</mark>");
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function escRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatBadge(fi) {
+  const fmt = fi.format;
+  const cls = ["FLAC","MP3","AAC","WAV","OGG"].includes(fmt) ? `badge-${fmt}` : "badge-other";
+  let label = fmt;
+  // Näytä bitrate kaikille paitsi FLAC (lossless, ei bitratea tarvita)
+  if (fmt !== "FLAC" && fi.bitrate_kbps) {
+    label += ` ${fi.bitrate_kbps}`;
+  }
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function renderResults(query) {
+  const q   = normalize(query);
+  const el  = document.getElementById("results");
+
+  if (!q) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:0.3">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+        </div>
+        <p>Kirjoita artistin nimi hakukenttään.</p>
+      </div>`;
+    return;
+  }
+
+  const hits = allAlbums.filter(a => normalize(a.artist).includes(q));
+
+  if (!hits.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <p>Ei tuloksia haulle <strong>${escHtml(query)}</strong>.</p>
+      </div>`;
+    return;
+  }
+
+  // Ryhmittele artisti-nimen mukaan
+  const byArtist = {};
+  hits.forEach(a => {
+    if (!byArtist[a.artist]) byArtist[a.artist] = [];
+    byArtist[a.artist].push(a);
+  });
+
+  const artists = Object.keys(byArtist).sort((a, b) => a.localeCompare(b, "fi"));
+
+  let html = `<ul class="album-list" role="list">`;
+  artists.forEach(artist => {
+    const artistAlbums = byArtist[artist].sort((a, b) => {
+      // Järjestä vuoden mukaan (uusin ensin), sitten albumin nimellä
+      const ya = a.year || "0000";
+      const yb = b.year || "0000";
+      return yb.localeCompare(ya) || a.album.localeCompare(b.album, "fi");
+    });
+
+    html += `<li>
+      <div class="section-header">${highlight(artist, query)}</div>
+      <ul class="album-list" role="list">`;
+
+    artistAlbums.forEach(a => {
+      const badges = (a.format_info || []).map(formatBadge).join("");
+      html += `<li class="album-item">
+        <div class="album-main">
+          <div class="album-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div class="album-text">
+            <div class="album-name">${escHtml(a.album)}</div>
+            <div class="album-badges">${badges}</div>
+          </div>
+          <div class="album-meta-right">
+            <div class="album-year">${a.year || ""}</div>
+            <div class="track-count">${a.track_count} raitaa</div>
+          </div>
+        </div>
+      </li>`;
+    });
+
+    html += `</ul></li>`;
+  });
+
+  html += `</ul>
+    <div style="text-align:center; font-size:12px; color:var(--muted); padding: 1rem;">
+      ${hits.length} albumia · ${artists.length} artistia
+    </div>`;
+
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>
