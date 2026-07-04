@@ -386,7 +386,7 @@ async function loadData(fileId, forceRefresh = false) {
     const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=AIzaSyD-9tSrke72PbmUwgebLNld7z2jh2WL-vI`;
     // Huom: yllä oleva on Googlen demo-avain rajoitetuilla oikeuksilla.
     // Julkiset tiedostot voi ladata myös suoraan:
-    const exportUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const exportUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=1`;
 
     const res  = await fetch(exportUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
